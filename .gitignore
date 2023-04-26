@@ -1,3 +1,9 @@
+# project
+venv
+telegram_base.db
+config.py
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
