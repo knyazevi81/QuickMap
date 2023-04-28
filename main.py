@@ -54,7 +54,7 @@ async def start_menu(message: types.Message):
     else:
         await bot.send_message(message.from_user.id, f'🌝Привет {message.from_user.username}\n'
                                                      f'🚧Для того чтобы начать пользоваться бо'
-                                                     f"том нажми 'зарегистрироваться'", reply_markup=keyboard)
+                                                     f"том нажми зарегистрироваться ", reply_markup=keyboard)
         last_message.append(message.message_id + 1)
         last_profile.append(message.from_user.id)
         last_username.append(message.from_user.username)
