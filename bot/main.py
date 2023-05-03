@@ -1,5 +1,6 @@
 import sqlite3
 import time
+import os
 from modules.parsing_tasks import *
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
@@ -10,15 +11,38 @@ from aiogram.utils.callback_data import CallbackData
 import config
 import datetime
 
-connect = sqlite3.connect('C:/Users/Admin/Desktop/QuickMap/telegram_base.db')
+connect = sqlite3.connect(os.path.join(os.getcwd(), 'telegram_base.db'))
 cursor = connect.cursor()
 
 bot = Bot(config.tele_token)
 dp = Dispatcher(bot)
 
-# Инлайн клавиатура
-keyboard = InlineKeyboardMarkup().add(InlineKeyboardButton(text='Зарегистрироваться', callback_data='up_profile'))
-menu_board = InlineKeyboardMarkup().add(InlineKeyboardButton(text='Вернуться в меню', callback_data='menu'))
+
+def main_keyboard(user_id: int):
+    admin_prof = cursor.execute(f"SELECT profile_id FROM profiles WHERE super_user='true'").fetchone()
+    try:
+        if user_id in admin_prof:
+            return InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(text='добавить задачу',
+                                                                          callback_data='add_task'),
+                                                         InlineKeyboardButton(text='увидеть все задания',
+                                                                          callback_data='all_task'),
+                                                         InlineKeyboardButton(text='создать команду',
+                                                                          callback_data='all_task'),
+                                                         )
+    except:
+        return InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(text='добавить задачу',
+                                                                          callback_data='add_task'),
+                                                     InlineKeyboardButton(text='увидеть все задания',
+                                                                          callback_data='all_task'))
+
+
+def registration():
+    return InlineKeyboardMarkup().add(InlineKeyboardButton(text='Зарегистрироваться', callback_data='up_profile'))
+
+
+add_task = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(text='добавить задачу', callback_data='add_task'),
+                                                 InlineKeyboardButton(text='увидеть все задания', callback_data='all_task'),
+                                                 InlineKeyboardButton(text='Зарегистрироваться', callback_data='up_profile'))
 
 # Кнопки
 menu_button = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton('/menu'))
@@ -28,6 +52,7 @@ last_profile = []
 last_username = []
 
 
+# Основные хэндлер
 @dp.message_handler(commands=['start', 'menu'])
 async def start_menu(message: types.Message):
     prompt = ''
@@ -41,25 +66,35 @@ async def start_menu(message: types.Message):
     else:
         emoji_todo = {1: '🟨', 0: '🟥'}
         for task in all_tasks_id:
-            prompt += f'{emoji_todo[task[0]]}#[{task[1]}]:  {task[2]}\n'
+            prompt += f'{emoji_todo[task[0]]}#[{task[1]}]: {task[2]}\n'
 
     if user_in_db(message.from_user.id, all_reg_id):
-        await message.reply_photo(photo=open('C:/Users/Admin/Desktop/QuickMap/images/title.png', 'rb'),
-                                  caption=f"👤Привет {message.from_user.username}\n"
-                                          f"На {str(datetime.date.today())[5:10]} у вас:\n"
-                                          f"###########################\n"
-                                          f"{prompt}\n"
-                                          f"###########################\n",
-                                  reply_markup=menu_button)
+        await bot.send_message(message.from_user.id, f"👤Привет {message.from_user.username}\n"
+                                                     f"На {str(datetime.date.today())[5:10]} у вас:\n"
+                                                     f"-----------------------------------\n"
+                                                     f"{prompt}\n"
+                                                     f"-----------------------------------\n"
+                                                     f"Ассисстент: {0}\n"
+                                                     f"режим администратора: {0}",
+                                                     reply_markup=main_keyboard(message.from_user.id))
     else:
         await bot.send_message(message.from_user.id, f'🌝Привет {message.from_user.username}\n'
                                                      f'🚧Для того чтобы начать пользоваться бо'
-                                                     f"том нажми зарегистрироваться ", reply_markup=keyboard)
+                                                     f"том нажми зарегистрироваться ", reply_markup=registration())
         last_message.append(message.message_id + 1)
         last_profile.append(message.from_user.id)
         last_username.append(message.from_user.username)
 
 
+@dp.message_handler()
+async def start_menu(message: types.Message):
+    if (message.text.split()[0]).lower() == 'admin' and message.text.split()[1] == config.admin_token:
+        cursor.execute(f"UPDATE profiles SET super_user = ? WHERE profile_id = '{message.from_user.id}'", ('true',))
+        await bot.send_message(message.from_user.id, '✅ Вы успешно активировали режим администратора')
+    connect.commit()
+
+
+# Инлайн хендрелы
 @dp.callback_query_handler(text="up_profile")
 async def send_random_value(callback: types.CallbackQuery):
     await bot.edit_message_text(message_id=last_message[-1], chat_id=last_profile[-1], text='🎉Вы успешно зарегистри'
@@ -67,8 +102,8 @@ async def send_random_value(callback: types.CallbackQuery):
                                                                                             'Нажмите на кнопку /menu '
                                                                                             'чтобы попасть на главную'
                                                                                             ' страницу')
-    data = (int(last_profile[-1]), f'@{last_username[-1]}', 'false')
-    cursor.execute('INSERT INTO profiles(profile_id, profile_username, activity) VALUES(?,?,?)', data)
+    data = (int(last_profile[-1]), f'@{last_username[-1]}', 'false', 'false', 'noneteem')
+    cursor.execute('INSERT INTO profiles(profile_id, profile_username, activity, super_user, teems) VALUES(?,?,?,?,?)', data)
     connect.commit()
 
 
